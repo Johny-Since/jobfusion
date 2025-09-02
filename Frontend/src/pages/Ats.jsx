@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Upload, Loader2, AlertTriangle, Download } from "lucide-react"
+import { Upload, Loader2, AlertTriangle, Download, FileText, CheckCircle, XCircle, Info } from "lucide-react"
 import jsPDF from 'jspdf'
 
 export default function ATSChecker() {
@@ -222,91 +222,200 @@ export default function ATSChecker() {
   // PDF generation for ATS analysis
   const downloadAnalysisPDF = () => {
     if (!result) return;
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    const margin = 40;
+    
+    const doc = new jsPDF({ 
+      unit: 'pt', 
+      format: 'a4',
+      orientation: 'portrait'
+    });
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 50;
+    const contentWidth = pageWidth - (margin * 2);
     let y = margin;
 
+    // Header with logo area
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pageWidth, 80, 'F');
+    
     // Title
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
-    doc.text('ATS Resume Analysis Report', margin, y);
-    y += 32;
-
-    // Score badge
-    doc.setFontSize(16);
+    doc.setFontSize(24);
+    doc.setTextColor(255, 255, 255);
+    doc.text('ATS Resume Analysis Report', margin, y + 35);
+    
+    // Date
     doc.setFont('helvetica', 'normal');
-    doc.setDrawColor(37, 99, 235);
-    doc.setFillColor(232, 240, 254);
-    doc.roundedRect(margin, y, 80, 40, 8, 8, 'FD');
-    doc.setTextColor(37, 99, 235);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${result.score}%`, margin + 40, y + 25, { align: 'center', baseline: 'middle' });
     doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    doc.text('ATS Score', margin + 40, y + 38, { align: 'center', baseline: 'middle' });
-    y += 60;
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth - margin - 120, y + 35);
+    
+    y = 120;
 
-    // Section: What Works Well
+    // Score Section with enhanced design
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Overall ATS Compatibility Score', margin, y);
+    y += 25;
+    
+    // Score circle background
+    const scoreColor = result.score >= 80 ? [34, 197, 94] : result.score >= 60 ? [251, 191, 36] : [239, 68, 68];
+    doc.setFillColor(...scoreColor);
+    doc.circle(margin + 50, y + 25, 35, 'F');
+    
+    // Score text
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${result.score}%`, margin + 50, y + 32, { align: 'center' });
+    
+    // Score description
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    const scoreDescription = result.score >= 80 
+      ? "Excellent! Your resume is highly ATS-compatible." 
+      : result.score >= 60 
+        ? "Good score, but there's room for improvement." 
+        : "Needs significant improvement for better ATS performance.";
+    doc.text(scoreDescription, margin + 120, y + 32);
+    
+    y += 80;
+
+    // Summary box
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, contentWidth, 60, 8, 8, 'FD');
+    
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(12);
+    doc.text('Key Insights:', margin + 15, y + 20);
+    doc.text(`• ${result.pros?.length || 0} strengths identified`, margin + 15, y + 35);
+    doc.text(`• ${result.cons?.length || 0} areas for improvement`, margin + 15, y + 50);
+    
+    y += 80;
+
+    // What Works Well Section
+    doc.setFillColor(240, 253, 244);
+    doc.setDrawColor(34, 197, 94);
+    doc.roundedRect(margin, y, contentWidth, 20, 5, 5, 'FD');
+    
     doc.setFontSize(15);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(34, 197, 94);
-    doc.text('What Works Well', margin, y);
-    y += 18;
+    doc.text('✓ What Works Well', margin + 10, y + 15);
+    y += 35;
+    
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
-    result.pros.forEach((pro) => {
-      doc.circle(margin + 6, y - 3, 3, 'F');
-      doc.text(pro, margin + 16, y);
-      y += 18;
+    doc.setTextColor(30, 30, 30);
+    
+    result.pros?.forEach((pro, index) => {
+      // Check if we need a new page
+      if (y > pageHeight - 100) {
+        doc.addPage();
+        y = margin;
+      }
+      
+      doc.setFillColor(34, 197, 94);
+      doc.circle(margin + 8, y - 2, 4, 'F');
+      
+      // Wrap long text
+      const lines = doc.splitTextToSize(pro, contentWidth - 30);
+      doc.text(lines, margin + 20, y);
+      y += lines.length * 15;
     });
-    y += 8;
+    y += 20;
 
-    // Section: Areas for Improvement
+    // Areas for Improvement Section
+    doc.setFillColor(254, 242, 242);
+    doc.setDrawColor(239, 68, 68);
+    doc.roundedRect(margin, y, contentWidth, 20, 5, 5, 'FD');
+    
     doc.setFontSize(15);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(239, 68, 68);
-    doc.text('Areas for Improvement', margin, y);
-    y += 18;
+    doc.text('✗ Areas for Improvement', margin + 10, y + 15);
+    y += 35;
+    
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
-    result.cons.forEach((con) => {
-      doc.setDrawColor(239, 68, 68);
+    doc.setTextColor(30, 30, 30);
+    
+    result.cons?.forEach((con, index) => {
+      // Check if we need a new page
+      if (y > pageHeight - 100) {
+        doc.addPage();
+        y = margin;
+      }
+      
       doc.setFillColor(239, 68, 68);
-      doc.circle(margin + 6, y - 3, 3, 'F');
-      doc.text(con, margin + 16, y);
-      y += 18;
+      doc.circle(margin + 8, y - 2, 4, 'F');
+      
+      // Wrap long text
+      const lines = doc.splitTextToSize(con, contentWidth - 30);
+      doc.text(lines, margin + 20, y);
+      y += lines.length * 15;
     });
-    y += 8;
+    y += 20;
 
-    // Section: Suggestions
+    // Improvement Suggestions Section
     if (result.suggestions && result.suggestions.length > 0) {
+      doc.setFillColor(239, 246, 255);
+      doc.setDrawColor(37, 99, 235);
+      doc.roundedRect(margin, y, contentWidth, 20, 5, 5, 'FD');
+      
       doc.setFontSize(15);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(37, 99, 235);
-      doc.text('Improvement Suggestions', margin, y);
-      y += 18;
+      doc.text('💡 Improvement Suggestions', margin + 10, y + 15);
+      y += 35;
+      
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(12);
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(30, 30, 30);
+      
       result.suggestions.forEach((suggestion, idx) => {
-        doc.setDrawColor(37, 99, 235);
+        // Check if we need a new page
+        if (y > pageHeight - 100) {
+          doc.addPage();
+          y = margin;
+        }
+        
         doc.setFillColor(232, 240, 254);
-        doc.circle(margin + 6, y - 3, 3, 'F');
-        doc.text(`${idx + 1}. ${suggestion}`, margin + 16, y);
-        y += 18;
+        doc.setDrawColor(37, 99, 235);
+        doc.roundedRect(margin + 5, y - 8, 15, 15, 3, 3, 'FD');
+        
+        doc.setTextColor(37, 99, 235);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${idx + 1}`, margin + 12, y + 2, { align: 'center' });
+        
+        doc.setTextColor(30, 30, 30);
+        doc.setFont('helvetica', 'normal');
+        
+        // Wrap long text
+        const lines = doc.splitTextToSize(suggestion, contentWidth - 40);
+        doc.text(lines, margin + 30, y);
+        y += lines.length * 15 + 10;
       });
     }
 
-    // Footer
-    y = 800;
+    // Enhanced Footer
+    const footerY = pageHeight - 40;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10);
+    
     doc.setFontSize(10);
-    doc.setTextColor(180, 180, 180);
-    doc.text('Generated by JobFusion ATS Resume Checker', margin, y);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Generated by JobFusion ATS Resume Checker', margin, footerY);
+    doc.text(`Report ID: ${Date.now()}`, pageWidth - margin - 100, footerY);
 
-    doc.save(`ATS-Analysis-${file?.name?.replace(/\.[^.]+$/, '') || 'result'}.pdf`);
+    // Save with enhanced filename
+    const fileName = `ATS-Analysis-${result.score}%-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    
+    toast.success('Enhanced ATS report downloaded successfully!', { position: 'top-center' });
   };
 
   return (
@@ -360,29 +469,170 @@ export default function ATSChecker() {
           )}
 
           {result && (
-            <div className="mt-8 bg-white shadow-xl rounded-2xl p-8 border border-gray-100">
+            <div className="mt-8 bg-white shadow-xl rounded-2xl border border-gray-100 overflow-hidden">
+              {/* Enhanced Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 border-b border-gray-200">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-6">
                 <div className="flex flex-col items-center md:items-start">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">ATS Compatibility Score</h2>
-                  <p className="text-gray-600 text-sm max-w-xs">This score estimates how well your resume will perform with Applicant Tracking Systems.</p>
+                    <div className="flex items-center gap-3 mb-3">
+                      <FileText className="w-8 h-8 text-blue-600" />
+                      <h2 className="text-3xl font-bold text-gray-900">ATS Analysis Report</h2>
+                    </div>
+                    <p className="text-gray-600 max-w-md">
+                      Comprehensive analysis of your resume's compatibility with Applicant Tracking Systems
+                    </p>
                 </div>
-                <div className="flex flex-col items-center">
-                  <div className="relative flex items-center justify-center">
-                    <svg className="w-20 h-20" viewBox="0 0 40 40">
-                      <circle cx="20" cy="20" r="18" fill="none" stroke="#E5E7EB" strokeWidth="4" />
+                  <div className="flex flex-col items-center">
+                    <div className="relative flex items-center justify-center mb-4">
+                      <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 40 40">
+                        <circle cx="20" cy="20" r="16" fill="none" stroke="#E5E7EB" strokeWidth="3" />
                       <circle
-                        cx="20" cy="20" r="18" fill="none"
-                        stroke="#2563EB"
-                        strokeWidth="4"
-                        strokeDasharray={2 * Math.PI * 18}
-                        strokeDashoffset={2 * Math.PI * 18 * (1 - result.score / 100)}
+                          cx="20" cy="20" r="16" fill="none"
+                          stroke={result.score >= 80 ? "#10B981" : result.score >= 60 ? "#F59E0B" : "#EF4444"}
+                          strokeWidth="3"
+                          strokeDasharray={2 * Math.PI * 16}
+                          strokeDashoffset={2 * Math.PI * 16 * (1 - result.score / 100)}
                         strokeLinecap="round"
-                        style={{ transition: 'stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1)' }}
+                          className="transition-all duration-1000 ease-out"
                       />
                     </svg>
-                    <span className="absolute text-2xl font-bold text-blue-600">{result.score}%</span>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-3xl font-bold text-gray-800">{result.score}%</span>
+                      </div>
                   </div>
-                  <span className="mt-2 text-sm text-gray-500 font-medium">
+                    <div className="text-center">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        result.score >= 80 
+                          ? 'bg-green-100 text-green-800' 
+                          : result.score >= 60 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : 'bg-red-100 text-red-800'
+                      }`}>
+                        {result.score >= 80 ? (
+                          <><CheckCircle className="w-4 h-4 mr-1" /> Excellent</>
+                        ) : result.score >= 60 ? (
+                          <><Info className="w-4 h-4 mr-1" /> Good</>
+                        ) : (
+                          <><XCircle className="w-4 h-4 mr-1" /> Needs Work</>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Content Sections */}
+              <div className="p-8">
+                <div className="grid md:grid-cols-2 gap-8 mb-8">
+                  {/* Strengths */}
+                  <div className="bg-green-50 rounded-xl p-6 border border-green-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-green-800">Strengths</h3>
+                    </div>
+                    <ul className="space-y-3">
+                      {result.pros?.map((pro, index) => (
+                        <li key={index} className="flex items-start gap-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <span className="text-green-700">{pro}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  
+                  {/* Areas for Improvement */}
+                  <div className="bg-red-50 rounded-xl p-6 border border-red-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                        <XCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-red-800">Areas for Improvement</h3>
+                    </div>
+                    <ul className="space-y-3">
+                      {result.cons?.map((con, index) => (
+                        <li key={index} className="flex items-start gap-3">
+                          <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <span className="text-red-700">{con}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                
+                {/* Improvement Suggestions */}
+                {result.suggestions && result.suggestions.length > 0 && (
+                  <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                        <Info className="w-5 h-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-blue-800">Actionable Recommendations</h3>
+                    </div>
+                    <div className="grid gap-4">
+                      {result.suggestions.map((suggestion, index) => (
+                        <div key={index} className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                          <div className="flex items-start gap-3">
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <span className="text-white text-sm font-bold">{index + 1}</span>
+                            </div>
+                            <p className="text-blue-800 font-medium">{suggestion}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="bg-gray-50 px-8 py-6 border-t border-gray-200">
+                <div className="flex flex-col md:flex-row md:justify-between gap-4">
+                  <button
+                    onClick={() => {
+                      setFile(null)
+                      setResult(null)
+                      setError(null)
+                    }}
+                    className="flex items-center justify-center gap-2 bg-white border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-xl hover:border-gray-400 hover:bg-gray-50 transition-all duration-200 font-medium"
+                  >
+                    <Upload className="w-5 h-5" />
+                    Analyze Another Resume
+                  </button>
+                  <button
+                    onClick={downloadAnalysisPDF}
+                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+                  >
+                    <Download className="w-5 h-5" />
+                    Download Detailed Report
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Enhanced Styles */}
+      <style>{`
+        @keyframes pulse-slow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.15); }
+          50% { box-shadow: 0 0 16px 8px rgba(59,130,246,0.10); }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .line-clamp-3 {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
+    </div>
+  )
+}
                     {result.score >= 80
                       ? "Excellent! Highly ATS-compatible."
                       : result.score >= 60

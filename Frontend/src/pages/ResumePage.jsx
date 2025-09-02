@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import ResumeBuilder from '../components/ResumeBuilder/ResumeBuilder';
 import Template05 from '../assets/Screenshot (67).png';
-// import Template06 from '../assets/Screenshot (68).png';
 
 export default function MainSection() {
   const [currentTip, setCurrentTip] = useState(0);
+  const [showBuilder, setShowBuilder] = useState(false);
 
   const resumeTips = [
     {
@@ -101,11 +102,12 @@ export default function MainSection() {
 
   // Function to handle scrolling to templates section
   const scrollToTemplates = () => {
-    const templatesSection = document.getElementById('resume-templates');
-    if (templatesSection) {
-      templatesSection.scrollIntoView({ behavior: 'smooth' });
-    }
+    setShowBuilder(true);
   };
+
+  if (showBuilder) {
+    return <ResumeBuilder />;
+  }
 
   return (
     <main className="w-full">
@@ -124,7 +126,7 @@ export default function MainSection() {
               onClick={scrollToTemplates}
               className="bg-blue-600 text-white px-8 py-3 rounded-full hover:bg-blue-700 transition-colors"
             >
-              Build Resume
+              Start Building Resume
             </button>
           </div>
           <div className="relative hidden md:block">
@@ -223,9 +225,9 @@ export default function MainSection() {
             {templates.map((template) => (
               <div 
                 key={template.id} 
-                className="bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105"
+                className="bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer"
+                onClick={() => setShowBuilder(true)}
               >
-                <Link to={template.path}>
                   <img
                     src={template.image}
                     alt={`Resume template ${template.id}`}
@@ -233,9 +235,22 @@ export default function MainSection() {
                     loading="lazy"
                     onError={(e) => console.error(`Failed to load image: ${template.image}`, e)}
                   />
-                </Link>
+                  <div className="p-4 text-center">
+                    <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                      Use This Template
+                    </button>
+                  </div>
               </div>
             ))}
+          </div>
+          
+          <div className="text-center mt-12">
+            <button
+              onClick={() => setShowBuilder(true)}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-12 py-4 rounded-full text-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              Start with Advanced Builder
+            </button>
           </div>
         </div>
       </section>

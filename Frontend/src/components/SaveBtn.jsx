@@ -8,6 +8,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 export default function BookmarkButton({ job }) {
   const [bookmarked, setBookmarked] = useState(false);
+  const [loading, setLoading] = useState(false);
   
   useEffect(() => {
     const checkSavedStatus = async () => {
@@ -16,11 +17,15 @@ export default function BookmarkButton({ job }) {
       
       if (email && token) {
         try {
-          const response = await axios.get(`http://localhost:5000/api/savedjobs/saved/${email}`, {
+          const response = await axios.get(
+            `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/savedjobs/saved/${email}`,
+            {
             headers: {
-              Authorization: `Bearer ${token}`
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
-          });
+          }
+          );
           
           if (response.data.success) {
             const savedJobs = response.data.data || [];
@@ -28,12 +33,16 @@ export default function BookmarkButton({ job }) {
             setBookmarked(isJobSaved);
           }
         } catch (error) {
-          console.error("Error checking saved status:", error);
+          if (error.response?.status !== 401) {
+            console.error("Error checking saved status:", error);
+          }
         }
       }
     };
 
-    checkSavedStatus();
+    if (job?.id) {
+      checkSavedStatus();
+    }
   }, [job.id]);
 
   const handleClick = async () => {
@@ -45,41 +54,55 @@ export default function BookmarkButton({ job }) {
       return;
     }
 
+    if (!job?.id) {
+      toast.error("Invalid job data.", { position: "top-center" });
+      return;
+    }
+
+    setLoading(true);
+
     // Optimistic UI update
     const newBookmarkedState = !bookmarked;
     setBookmarked(newBookmarkedState);
     
     try {
       if (newBookmarkedState) {
+        // Ensure job data is properly structured
         const jobData = {
           id: job.id,
           jobTitle: job.title || job.jobTitle,
-          companyName: job.company || job.companyName,
-          location: job.location,
+          companyName: job.company?.display_name || job.company || job.companyName,
+          location: job.location?.display_name || job.location,
           salary: job.salary,
           description: job.description,
           redirect_url: job.redirect_url
         };
 
-        const response = await axios.post("http://localhost:5000/api/savedjobs/save", { 
-          email, 
-          jobData 
-        }, {
+        const response = await axios.post(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/savedjobs/save`,
+          { email, jobData },
+          {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
-        });
+        }
+        );
 
         if (response.data.success) {
           toast.success("Job saved successfully!", { position: "top-center" });
         }
       } else {
-        const response = await axios.delete("http://localhost:5000/api/savedjobs/unsave", {
-          data: { email, jobId: job.id },
-          headers: {
-            Authorization: `Bearer ${token}`
+        const response = await axios.delete(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/savedjobs/unsave`,
+          {
+            data: { email, jobId: job.id },
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
           }
-        });
+        );
         
         if (response.data.success) {
           toast.info("Job removed from saved list.", { position: "top-center" });
@@ -87,14 +110,28 @@ export default function BookmarkButton({ job }) {
       }
     } catch (error) {
       console.error("Error updating saved jobs:", error);
-      toast.error("Failed to update saved jobs.", { position: "top-center" });
+      
+      if (error.response?.status === 401) {
+        toast.error("Session expired. Please log in again.", { position: "top-center" });
+        localStorage.removeItem("token");
+        localStorage.removeItem("userEmail");
+      } else {
+        toast.error("Failed to update saved jobs.", { position: "top-center" });
+      }
+      
       setBookmarked(!newBookmarkedState); // Rollback UI on error
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <>
-      <button onClick={handleClick} className="p-2 rounded-full bg-transparent border-none cursor-pointer">
+      <button 
+        onClick={handleClick} 
+        disabled={loading}
+        className="p-2 rounded-full bg-transparent border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      >
         <AnimatePresence mode="wait">
           {bookmarked ? (
             <motion.div
@@ -104,7 +141,7 @@ export default function BookmarkButton({ job }) {
               exit={{ scale: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <BookmarkAddedIcon fontSize="large" style={{ color: "lightblue" }} />
+              <BookmarkAddedIcon fontSize="large" style={{ color: "#3b82f6" }} />
             </motion.div>
           ) : (
             <motion.div
@@ -114,13 +151,10 @@ export default function BookmarkButton({ job }) {
               exit={{ scale: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <BookmarkAddIcon fontSize="large" style={{ color: "lightblue" }} />
+              <BookmarkAddIcon fontSize="large" style={{ color: "#6b7280" }} />
             </motion.div>
           )}
         </AnimatePresence>
       </button>
-
-      <ToastContainer autoClose={2000} hideProgressBar={false} />
     </>
   );
-}

@@ -1,8 +1,14 @@
 const axios = require('axios');
+const logger = require('../utils/logger');
 
 // Load environment variables for Adzuna API
 const ADZUNA_APP_ID = process.env.ADZUNA_APP_ID; // Your app ID from .env
 const ADZUNA_APP_KEY = process.env.ADZUNA_APP_KEY; // Your app key from .env
+
+// Validate API credentials
+if (!ADZUNA_APP_ID || !ADZUNA_APP_KEY) {
+  logger.error('Adzuna API credentials not configured');
+}
 
 /**
  * Search Jobs API
@@ -26,6 +32,8 @@ const ADZUNA_APP_KEY = process.env.ADZUNA_APP_KEY; // Your app key from .env
 const searchJobs = async (req, res) => {
   const { what, where, salary_min, full_time, permanent, sort_by, results_per_page } = req.query;
 
+  logger.info('Job search request', { what, where, salary_min });
+
   const url = `http://api.adzuna.com/v1/api/jobs/gb/search/1`;
 
   const params = {
@@ -42,11 +50,34 @@ const searchJobs = async (req, res) => {
   };
 
   try {
-    const response = await axios.get(url, { params });
-    res.json(response.data);
+    const response = await axios.get(url, { 
+      params,
+      timeout: 10000 // 10 second timeout
+    });
+    
+    logger.info('Job search successful', { 
+      resultCount: response.data.results?.length || 0,
+      totalCount: response.data.count || 0
+    });
+    
+    res.json({
+      success: true,
+      data: response.data,
+      message: 'Jobs fetched successfully'
+    });
   } catch (error) {
-    console.error('Error fetching data from Adzuna API:', error.response ? error.response.data : error.message);
-    res.status(500).json({ error: 'Failed to fetch data from Adzuna API', details: error.response ? error.response.data : error.message });
+    logger.error('Error fetching jobs from Adzuna API:', {
+      error: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch jobs from external API', 
+      message: 'Please try again later',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -66,13 +97,19 @@ const getTrendingJobs = async (req, res) => {
     app_id: ADZUNA_APP_ID,
     app_key: ADZUNA_APP_KEY,
     results_per_page: 50, // Fetch 50 jobs
+    sort_by: 'salary',
+    full_time: 1
   };
 
   try {
-    const response = await axios.get(url, { params });
+    const response = await axios.get(url, { 
+      params,
+      timeout: 10000
+    });
     const jobs = response.data.results;
 
     if (!jobs || jobs.length === 0) {
+      logger.warn('No jobs found in trending jobs API');
       return res.status(200).json({
         success: true,
         data: [],
@@ -95,17 +132,28 @@ const getTrendingJobs = async (req, res) => {
       }
     });
 
+    logger.info('Trending jobs fetched successfully', { 
+      maxVacancyCount: maxCount,
+      trendingJobsCount: highestVacancyJobs.length
+    });
+
     // Return the job(s) with the highest count
     res.status(200).json({
       success: true,
       data: highestVacancyJobs,
+      message: 'Trending jobs fetched successfully'
     });
   } catch (error) {
-    console.error("Error fetching trending jobs:", error.message);
+    logger.error("Error fetching trending jobs:", {
+      error: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
     res.status(500).json({
       success: false,
       message: "Error fetching trending jobs",
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
@@ -126,17 +174,32 @@ const getTrendingJobs = async (req, res) => {
  */
 const getRandomJobs = async (req, res) => {
   const { count = 6 } = req.query; // Default to 6 random jobs if count is not provided
+  
+  logger.info('Random jobs request', { count });
 
   const url = `http://api.adzuna.com/v1/api/jobs/gb/search/1`;
   const params = {
     app_id: ADZUNA_APP_ID,
     app_key: ADZUNA_APP_KEY,
     results_per_page: 50, // Fetch a large pool of jobs to randomize from
+    sort_by: 'date'
   };
 
   try {
-    const response = await axios.get(url, { params });
+    const response = await axios.get(url, { 
+      params,
+      timeout: 10000
+    });
     const jobs = response.data.results;
+
+    if (!jobs || jobs.length === 0) {
+      logger.warn('No jobs available for random selection');
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: "No jobs available at the moment"
+      });
+    }
 
     // Shuffle the jobs array
     for (let i = jobs.length - 1; i > 0; i--) {
@@ -145,18 +208,30 @@ const getRandomJobs = async (req, res) => {
     }
 
     // Select the desired number of random jobs
-    const randomJobs = jobs.slice(0, Math.min(count, jobs.length));
+    const requestedCount = Math.min(parseInt(count) || 6, 20); // Max 20 jobs
+    const randomJobs = jobs.slice(0, Math.min(requestedCount, jobs.length));
+    
+    logger.info('Random jobs fetched successfully', { 
+      requestedCount,
+      returnedCount: randomJobs.length
+    });
 
     res.status(200).json({
       success: true,
       data: randomJobs,
+      message: 'Random jobs fetched successfully'
     });
   } catch (error) {
-    console.error('Error fetching random jobs:', error.message);
+    logger.error('Error fetching random jobs:', {
+      error: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
     res.status(500).json({
       success: false,
       message: 'Error fetching random jobs',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };

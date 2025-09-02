@@ -44,6 +44,12 @@ const JobCard = ({ job, onToggle }) => {
         {job.location && (
           <p className="text-gray-600 text-sm mb-2">📍 {job.location.display_name}</p>
         )}
+        {job.salary_min && (
+          <p className="text-green-600 text-sm font-medium">
+            💰 ₹{Math.floor(job.salary_min).toLocaleString()} - ₹
+            {Math.floor(job.salary_max).toLocaleString()}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -51,31 +57,90 @@ const JobCard = ({ job, onToggle }) => {
 
 const TrendingJobs = () => {
   const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const jobsCache = useRef(null); // Memoize API response
 
   const fetchTrendingJobs = async () => {
-    if (jobsCache.current) return setJobs(jobsCache.current); // Use cached data if available
+    if (jobsCache.current) {
+      setJobs(jobsCache.current);
+      setLoading(false);
+      return;
+    }
 
     try {
+      setLoading(true);
+      setError(null);
       const { VITE_ADZUNA_API_ID, VITE_ADZUNA_API_KEY } = import.meta.env;
+      
+      if (!VITE_ADZUNA_API_ID || !VITE_ADZUNA_API_KEY) {
+        throw new Error('API credentials not configured');
+      }
+      
       const response = await axios.get("https://api.adzuna.com/v1/api/jobs/in/search/1", {
         params: {
           app_id: VITE_ADZUNA_API_ID,
           app_key: VITE_ADZUNA_API_KEY,
           results_per_page: 8,
+          sort_by: 'salary',
+          full_time: 1
         },
+        timeout: 10000 // 10 second timeout
       });
 
-      jobsCache.current = response.data.results; // Cache the results
-      setJobs(response.data.results);
+      const jobResults = response.data.results || [];
+      jobsCache.current = jobResults;
+      setJobs(jobResults);
     } catch (error) {
       console.error("Error fetching trending jobs:", error);
+      setError("Failed to load trending jobs. Please try again later.");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!jobsCache.current) fetchTrendingJobs();
+    fetchTrendingJobs();
   }, []);
+
+  if (loading) {
+    return (
+      <section className="py-16 px-6">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">
+            Fast-Track Job Openings in India
+          </h2>
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="py-16 px-6">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">
+            Fast-Track Job Openings in India
+          </h2>
+          <div className="text-center py-12">
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={() => {
+                jobsCache.current = null;
+                fetchTrendingJobs();
+              }}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-16 px-6">
@@ -83,11 +148,17 @@ const TrendingJobs = () => {
         <h2 className="text-3xl font-bold text-center mb-12">
           Fast-Track Job Openings in India
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {jobs.map((job) => (
-            <JobCard key={job.id} job={job} onToggle={fetchTrendingJobs} />
-          ))}
-        </div>
+        {jobs.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {jobs.map((job) => (
+              <JobCard key={job.id} job={job} onToggle={fetchTrendingJobs} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-600">No trending jobs available at the moment.</p>
+          </div>
+        )}
       </div>
     </section>
   );
